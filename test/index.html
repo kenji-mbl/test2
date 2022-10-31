@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+	<head>
+		<title>TR-B39 地上・BS NVRAM事業者共通領域テスト</title>
+		<meta charset="UTF-8" >
+		<meta name="viewport" content="width=1920">
+		<style>
+/* reset */
+html, body, div, span, p, img, label, table, tbody, tfoot, thead, tr, th, td, audio, video {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	font: inherit;
+	vertical-align: baseline;
+	color: #000000;
+	font-size: 15px;
+}
+
+body {
+	overflow:hidden;
+	background-color:transparent;
+}
+object {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	vertical-align: baseline;
+	background-color:transparent;
+}
+
+p {
+	padding-top: 5px;
+	padding-left: 1.5%;
+	font-weight: bold;
+	font-size: 15px;
+	text-size-adjust: 100%;
+	line-height:1.2;
+}
+
+div.divButton {
+	background-color:#FFFFFF;
+	margin-top: 5px;
+	height: 25px;
+	padding-left: 2%;
+	font-size: 17px;
+	transition: 0.1s;
+}
+
+div.divButtonFocused {
+	background-color:#DDDDDD;
+	font-weight: bold;
+	font-size: 18px;
+}
+
+div.divButtonPressed {
+	-webkit-transform: translateY(3px);
+	transform: translateY(2px);
+}
+
+		</style>
+	</head>
+	
+	<body onload="onloadEvent();">
+		<object id="video" type="video/x-arib2-broadcast" style="position:absolute; z-index:10; top: 15%; left: 3%; width:20%; height:20%;"></object>
+		<audio id="romsound" preload="auto" src=""></audio>
+		<div id="screen" style="visibility:visible;">
+			<div id="bg" style="position:absolute; z-index:0; width:100%; height:100%; background-repeat:no-repeat; background-color:#00AA00;"></div>
+			<div id="title" style="position:absolute; z-index:10; top: 2%; left: 3%; width:20%; height:11%; background-color:#FFFFFF;">
+				<p id="title_text" style="text-align:center; font-size: 17px;padding-top: 3%">TR-B39<br>地上・BS NVRAM事業者共通領域テスト</p>
+				<table style="padding-top:2%; margin:0 auto; font-size: 16px;">
+					<tr>
+						<td style="text-align:right;">tlv_stream_id：</td><td id="ts_id">0x0000</td>
+					</tr>
+					<tr>
+						<td style="text-align:right;">service_id：</td><td id="s_id">0x0000</td>
+					</tr>
+				</table>
+			</div>
+			
+			<div id="buttons" style="position:absolute; z-index:10; top: 38%; left: 3%; width:20%; height:59%;">
+				<div id="divButton0"  class="divButton" onclick="test_hasCapability('bs_common');">事業者共通領域(ＢＳ)対応判定</div>
+				<div id="divButton1"  class="divButton" onclick="test_hasCapability('tr_common');">事業者共通領域(地上)対応判定</div>
+				<div id="divButton2"  class="divButton" onclick="void(0);">　</div>
+				<div id="divButton3"  class="divButton" onclick="test_write_bs_common();">事業者共通領域(ＢＳ)書き込みテスト実行</div>
+				<div id="divButton4"  class="divButton" onclick="test_read_bs_common();">事業者共通領域(ＢＳ)読み込みテスト実行</div>
+				<div id="divButton5"  class="divButton" onclick="test_view_bs_common();">事業者共通領域(ＢＳ)読み込み値 表示</div>
+				<div id="divButton6"  class="divButton" onclick="void(0);">　</div>
+				<div id="divButton7"  class="divButton" onclick="test_write_tr_common();">事業者共通領域(地上)書き込みテスト実行</div>
+				<div id="divButton8"  class="divButton" onclick="test_read_tr_common();">事業者共通領域(地上)読み込みテスト実行</div>
+				<div id="divButton9"  class="divButton" onclick="test_view_tr_common();">事業者共通領域(地上)読み込み値 表示</div>
+				</br>
+				<div id="divButton10" class="divButton" onclick="test_write_dummy_bs_common();">事業者共通領域(ＢＳ) 固定値書き込み実行</div>
+				<div id="divButton11" class="divButton" onclick="test_write_dummy_tr_common();">事業者共通領域(地上) 固定値書き込み実行</div>
+				<div id="divButton12" class="divButton" onclick="void(0);">　</div>
+				<div id="divButton13" class="divButton" onclick="void(0);">　</div>
+				<div id="divButton14" class="divButton" onclick="void(0);">　</div>
+				<div id="divButton15" class="divButton" onclick="void(0);">　</div>
+				<div id="divButton16" class="divButton" onclick="void(0);">　</div>
+				<div id="divButton17" class="divButton" onclick="void(0);">　</div>
+				<div id="divButton18" class="divButton" onclick="void(0);">　</div>
+				<div id="divButton19" class="divButton" onclick="logClear();">ログクリア</div>
+			</div>
+			
+			<div id="logs" style="position:absolute; z-index:10; top: 2%; left: 28%; width:68%; height:96%; background-color:#FFFFFF; overflow: auto;">
+				<p id="logp" style="padding-top: 5px; padding-left: 1.5%; font-weight: bold; font-size: 18px;">実行結果<br></p>
+			</div>
+			
+		</div>
+		
+		<script>
+
+var focudButtonIdx = 0;
+
+var tsid = "0000";
+
+
+//オンロードイベント時に呼び出す関数
+function onloadEvent(){
+	
+	//tvl_stream_id、service_id表示
+	var video = document.getElementById("video");
+	if (typeof video.getVideoSrc === "function") {
+		try{
+			var triplet =  video.getVideoSrc().split("/")[2].toLowerCase().split(".");
+			document.getElementById("ts_id").innerHTML = "0x" + triplet[1];
+			document.getElementById("s_id").innerHTML = "0x" + triplet[2];
+			tsid = triplet[1];
+		}catch(e){
+			logWrite("tlv_stream_id、service_idの取得に失敗しました　例外：" + e.toString());
+		}
+	}
+	
+	//ボタンフォーカス
+	focudButtonIdx = 0;
+	buttonFocus(focudButtonIdx);
+	
+	
+	//keySet、イベント登録
+	try{
+		if ((navigator.userAgent.indexOf("Hybridcast/1.0") >= 0) || (navigator.userAgent.indexOf("A-PAB/1.0") >= 0)) {
+			var keySet = navigator.applicationManager.getOwnerApplication().keySet;
+			var ret = keySet.setValue( keySet.RED | keySet.GREEN | keySet.YELLOW | keySet.BLUE | keySet.NAVIGATION | keySet.DBUTTON);
+		} else {
+			VK_UP = 38;
+			VK_DOWN = 40;
+			VK_ENTER = 13;
+		}
+		document.addEventListener("keydown", remoteControlKeyDownEvent, false);
+	}catch( e ){
+		logWrite("キーイベントの登録に失敗しました　例外：" + e.toString());
+	}
+	
+	
+	//受信機情報の表示
+	try{
+		var systemInfo = navigator.receiverDevice.getSystemInformation(null);
+		logWrite("getSystemInformation()の情報<br>makerid = " + systemInfo.makerid.toLowerCase() + ",　browsername = " + systemInfo.browsername + ",　browserversion = " + systemInfo.browserversion + ",　modelname = " + systemInfo.modelname);
+		logWrite("");
+	}catch( e ){
+	}
+	
+}
+
+
+
+var targetKeycodes = [40, 38, 37, 39, 13, 8, 68, 66, 82, 71, 89];
+
+var CCFlag = false;	//chatteringCancelFlag
+function resetCCFlag(){
+	CCFlag = false;
+}
+
+//キー操作イベントリスナー
+function remoteControlKeyDownEvent(e) {
+	var key_code = e.keyCode;
+	
+	for (i = 0; i < targetKeycodes.length; i++) {
+		if(e.keyCode == targetKeycodes[i]){
+			e.preventDefault();		//デフォルト動作を停止
+		}
+	}
+	
+	if(CCFlag == true){	//チャタリングキャンセル
+		return;
+	}
+	
+	try{
+		if(VK_DOWN == key_code){
+			buttonFocus(focudButtonIdx + 1);
+		}else if(VK_UP == key_code){
+			buttonFocus(focudButtonIdx - 1);
+		}else if(VK_ENTER == key_code){
+			var targetElm = document.getElementById("divButton" + focudButtonIdx.toString());
+			targetElm.className += " divButtonPressed";
+			targetElm.click();
+			setTimeout(function(){
+				document.getElementById("divButton" + focudButtonIdx.toString()).className = "divButton divButtonFocused";
+			}, 250);
+		}
+		
+	}catch( e ){
+	}
+	
+	//チャタリング防止
+	if(CCFlag != true){
+		CCFlag = true;
+		setTimeout(resetCCFlag,50);
+	}
+}
+
+
+//ボタンフォーカス処理
+function buttonFocus(idx){
+	if((idx>=0) && (idx < 20)){
+	} else if(idx >= 20) {
+		idx = 0;
+	} else if(idx < 0) {
+		idx = 19;
+	}
+	for (var i = 0; i < 20; i++) {
+		document.getElementById("divButton" + i.toString()).className = "divButton";
+	}
+	document.getElementById("divButton" + idx.toString()).className += " divButtonFocused";
+	focudButtonIdx = idx;
+}
+
+
+
+//ログ表示機能
+function logWrite(logStr){
+	document.getElementById("logp").innerHTML += logStr + "<br>";
+	var logs = document.getElementById("logs");
+	logs.scrollTop = logs.scrollHeight;				//最終行にスクロールする
+}
+
+
+function logClear(){
+	document.getElementById("logp").innerHTML = "";
+}
+
+
+
+
+
+//テスト事項
+function test_hasCapability(param){
+	if (typeof navigator === "undefined") {
+		logWrite("判定を実行できませんでした(navigator未定義)");
+		return;
+	}
+	if (typeof navigator.capabilities == "undefined"){
+		logWrite("判定を実行できませんでした(navigator.capabilities未定義)");
+		return;
+	}
+	if (typeof navigator.capabilities.hasCapability == "undefined"){
+		logWrite("判定を実行できませんでした(navigator.capabilities.hasCapability未定義)");
+		return;
+	}
+	
+	try{
+		var ret = navigator.capabilities.hasCapability("APIGroup", param);
+		logWrite("hasCapability(APIGroup, " + param + ")の判定結果："  + String(ret));
+	} catch(e){
+		logWrite("hasCapability(APIGroup, " + param + ")の実行で例外発生：　" + e.toString());
+	}
+	logWrite("");
+}
+
+
+
+
+var file_tr_base = "nvram://tr_common/";
+var file_bs_base = "nvram://bs_common/";
+
+var allowed_tsids = ["7fe2", "7fe3", "7fe4", "7fe5", "7fe6", "4010", "4011", "4012", "40d0", "40d1", "b070", "b071", "b072", "b111", "b112"];
+//					  NTV	  TBS	  CX	  EX	  TX	  BS朝日  BS-TBS  BSTX	 BS日本   BSフジ  BS朝日4 BSTX4   BS日本4 BSTBS4  BSフジ4
+
+
+var fmt1 = "U:6b,U:5b,U:5b,U:4b,U:12b,S:4B,S:40B,U:8b,U:6b,U:5b,U:5b,U:4b,U:12b,S:11B";
+//			0	 1	  2	   3	4	  5	   6	 7	  8	   9	10   11	  12	13
+
+var fmt2 = "U:6b,U:5b,U:5b,U:4b,U:12b,S:4B,S:40B,S:14B,S:2B";
+//			0	 1	  2	   3	4	  5	   6	 7	   8
+
+var fmts_tr = [];
+fmts_tr[24] = fmt1;
+fmts_tr[25] = fmt1;
+fmts_tr[26] = fmt2;
+fmts_tr[27] = fmt2;
+fmts_tr[28] = fmt2;
+fmts_tr[29] = fmt2;
+fmts_tr[30] = fmt1;
+fmts_tr[31] = fmt1;
+
+var fmts_bs = [];
+fmts_bs[0]  = fmt1;
+fmts_bs[14] = fmt2;
+fmts_bs[15] = fmt1;
+
+
+
+var yobi11 = "あyyyyyyyyy";
+var yobi12 = "yyyyyyyyyyy";
+var yobi20 = "yy";
+
+var yobi_tr = [];
+yobi_tr[24] = yobi11;
+yobi_tr[25] = yobi12;
+yobi_tr[26] = yobi20;
+yobi_tr[27] = yobi20;
+yobi_tr[28] = yobi20;
+yobi_tr[29] = yobi20;
+yobi_tr[30] = yobi12;
+yobi_tr[31] = yobi12;
+
+var yobi_bs = [];
+yobi_bs[0]  = yobi11;
+yobi_bs[14] = yobi20;
+yobi_bs[15] = yobi12;
+
+var S40Bno36 = "abcdefghijklmnopqrstuvwxyz0123456789";
+
+
+function test_write_bs_common(){
+	try{
+		var ret = navigator.capabilities.hasCapability("APIGroup", "bs_common");
+		if(ret != true){
+			logWrite("hasCapability(APIGroup, bs_common)の判定結果がtrueではないが、テストストリームのため無視してテストを実行");
+		}
+	} catch(e){
+		logWrite("hasCapability(APIGroup, bs_common)の実行がNGだが、テストストリームのため無視してテストを実行");
+	}
+	
+	var nowD = new Date();
+	var tempTS = nowD.getFullYear() + ("0" + (nowD.getMonth() + 1)).slice(-2) + ("0" + nowD.getDate()).slice(-2) + ("0" + nowD.getHours()).slice(-2) + ("0" + nowD.getMinutes()).slice(-2) + ("0" + nowD.getSeconds()).slice(-2);
+	var tempSec = parseInt(nowD.getSeconds(),10);
+	
+	for (var i = 0; i <= 15; i++) {
+		var nd = new Array();
+		nd[0] = parseInt(nowD.getMinutes(),10);			//0:[分]
+		nd[1] = parseInt(nowD.getHours(),10);			//1:[時]
+		nd[2] = parseInt(nowD.getDate(),10);			//2:[日]
+		nd[3] = parseInt(nowD.getMonth(),10)+1;			//3:[月](1-12)
+		nd[4] = parseInt(nowD.getFullYear(),10);		//4:[年]
+		
+		nd[5] = tsid;									//5:[tlv_stream_id]
+		
+		if((i==0) || (i==14) || (i==15)){
+			nd[6]  = "bs" + ("0" + i.toString()).slice(-2) + S40Bno36;		//6: [40文字]
+			
+			if(fmts_bs[i] == fmt1){
+				nd[7]  = tempSec;						//7: [秒]
+				nd[8]  = nd[0];							//8: [分]
+				nd[9]  = nd[1];							//9: [時]
+				nd[10] = nd[2];							//10:[日]
+				nd[11] = nd[3];							//10:[月]
+				nd[12] = nd[4];							//11:[年]
+				nd[13] = yobi_bs[i];					//12:[予備]
+			} else {
+				nd[7]  = tempTS;						//7: [yyyyMMddHHmmss]
+				nd[8]  = yobi_bs[i];					//8: [予備]
+			}
+			
+			try{
+				var ret = navigator.bmlCompat.browserPseudo.writePersistentArray(file_bs_base + i.toString(), fmts_bs[i], nd);
+				if(ret == 64){
+					logWrite(file_bs_base + i.toString() + " 書込結果：OK");
+				} else {
+					logWrite(file_bs_base + i.toString() + " 書込結果：NG　戻り値=" + String(ret));
+				}
+			}catch(e){
+				logWrite(file_bs_base + i.toString() + " 書込結果：NG　例外発生 " + e.toString());
+			}
+		}
+	}
+	logWrite("");
+}
+
+
+function test_read_bs_common(){
+	try{
+		var ret = navigator.capabilities.hasCapability("APIGroup", "bs_common");
+		if(ret != true){
+			logWrite("hasCapability(APIGroup, bs_common)の判定結果がtrueではないが、テストストリームのため無視してテストを実行");
+		}
+	} catch(e){
+		logWrite("hasCapability(APIGroup, bs_common)の実行がNGだが、テストストリームのため無視してテストを実行");
+	}
+	
+	for (var i = 0; i <= 15; i++) {
+		if((i==0) || (i==14) || (i==15)){
+			try{
+				var rArray = navigator.bmlCompat.browserPseudo.readPersistentArray(file_bs_base + i.toString(), fmts_bs[i]);
+				if(rArray == null){
+					logWrite(file_bs_base + i.toString() + " 読込：NG　戻り値=null");
+					continue;
+				}
+				
+				var resultMsg = "";
+				if(rArray.length == fmts_bs[i].split(",").length){
+					resultMsg = file_bs_base + i.toString() + " 読込：OK　";
+					
+					if((typeof rArray[0] !== 'number') || (typeof rArray[1] !== 'number') || (typeof rArray[2] !== 'number') || (typeof rArray[3] !== 'number') || (typeof rArray[4] !== 'number')){
+						resultMsg += "読込内容：NG(戻り値Array[0]-[4])";
+						logWrite(resultMsg);
+						continue;
+					}
+					
+					var evaluation_tsid = false;
+					for (var j = 0; j < allowed_tsids.length; j++) {
+						if(rArray[5] == allowed_tsids[j]){
+							evaluation_tsid = true;
+							break;
+						}
+					}
+					if(evaluation_tsid == false){
+						resultMsg += "読込内容：NG(戻り値Array[5])";
+						logWrite(resultMsg);
+						continue;
+					}
+					
+					if(rArray[6] != "bs" + ("0" + i.toString()).slice(-2) + S40Bno36){
+						resultMsg += "読込内容：NG(戻り値Array[6])";
+						logWrite(resultMsg);
+						continue;
+					}
+					
+					if(fmts_bs[i] == fmt1){
+						if(rArray[13] != yobi_bs[i]){
+							resultMsg += "読込内容：NG(戻り値Array[13])";
+							logWrite(resultMsg);
+							continue;
+						}
+					} else {
+						if(rArray[8] != yobi_bs[i]){
+							resultMsg += "読込内容：NG(戻り値Array[8])";
+							logWrite(resultMsg);
+							continue;
+						}
+					}
+					
+					resultMsg += "読込内容：OK";
+					logWrite(resultMsg);
+					
+				} else {
+					resultMsg = file_bs_base + i.toString() + " 読込：NG　";
+				}
+				
+			} catch(e){
+				logWrite(file_bs_base + i.toString() + " 読込：NG　例外発生 " + e.toString());
+			}
+		}
+	}
+	logWrite("");
+}
+
+function test_view_bs_common(){
+	try{
+		var ret = navigator.capabilities.hasCapability("APIGroup", "bs_common");
+		if(ret != true){
+			logWrite("hasCapability(APIGroup, bs_common)の判定結果がtrueではないが、テストストリームのため無視してテストを実行");
+		}
+	} catch(e){
+		logWrite("hasCapability(APIGroup, bs_common)の実行がNGだが、テストストリームのため無視してテストを実行");
+	}
+	
+	for (var i = 0; i <= 15; i++) {
+		if((i==0) || (i==14) || (i==15)){
+			try{
+				var rArray = navigator.bmlCompat.browserPseudo.readPersistentArray(file_bs_base + i.toString(), fmts_bs[i]);
+				if(rArray == null){
+					logWrite(file_bs_base + i.toString() + " 読込：NG　戻り値=null");
+				} else {
+					logWrite(file_bs_base + i.toString() + " = " + rArray.join(", "));
+				}
+			} catch(e){
+				logWrite(file_bs_base + i.toString() + " 読込：NG　例外発生 " + e.toString());
+			}
+		}
+	}
+	logWrite("");
+}
+
+function test_write_tr_common(){
+	try{
+		var ret = navigator.capabilities.hasCapability("APIGroup", "tr_common");
+		if(ret != true){
+			logWrite("hasCapability(APIGroup, tr_common)の判定結果がtrueではないが、テストストリームのため無視してテストを実行");
+		}
+	} catch(e){
+		logWrite("hasCapability(APIGroup, tr_common)の実行がNGだが、テストストリームのため無視してテストを実行");
+	}
+	
+	var nowD = new Date();
+	var tempTS = nowD.getFullYear() + ("0" + (nowD.getMonth() + 1)).slice(-2) + ("0" + nowD.getDate()).slice(-2) + ("0" + nowD.getHours()).slice(-2) + ("0" + nowD.getMinutes()).slice(-2) + ("0" + nowD.getSeconds()).slice(-2);
+	var tempSec = parseInt(nowD.getSeconds(),10);
+	
+	for (var i = 0; i <= 31; i++) {
+		var nd = new Array();
+		nd[0] = parseInt(nowD.getMinutes(),10);			//0:[分]
+		nd[1] = parseInt(nowD.getHours(),10);			//1:[時]
+		nd[2] = parseInt(nowD.getDate(),10);			//2:[日]
+		nd[3] = parseInt(nowD.getMonth(),10)+1;			//3:[月](1-12)
+		nd[4] = parseInt(nowD.getFullYear(),10);		//4:[年]
+		
+		nd[5] = tsid;									//5:[tlv_stream_id]
+		
+		if(i>=24){
+			nd[6]  = "tr" + ("0" + i.toString()).slice(-2) + S40Bno36;		//6: [40文字]
+			
+			if(fmts_tr[i] == fmt1){
+				nd[7]  = tempSec;						//7: [秒]
+				nd[8]  = nd[0];							//8: [分]
+				nd[9]  = nd[1];							//9: [時]
+				nd[10] = nd[2];							//10:[日]
+				nd[11] = nd[3];							//10:[月]
+				nd[12] = nd[4];							//11:[年]
+				nd[13] = yobi_tr[i];					//12:[予備]
+			} else {
+				nd[7]  = tempTS;						//7: [yyyyMMddHHmmss]
+				nd[8]  = yobi_tr[i];					//8: [予備]
+			}
+			
+			try{
+				var ret = navigator.bmlCompat.browserPseudo.writePersistentArray(file_tr_base + i.toString(), fmts_tr[i], nd);
+				if(ret == 64){
+					logWrite(file_tr_base + i.toString() + " 書込結果：OK");
+				} else {
+					logWrite(file_tr_base + i.toString() + " 書込結果：NG　戻り値=" + String(ret));
+				}
+			}catch(e){
+				logWrite(file_tr_base + i.toString() + " 書込結果：NG　例外発生 " + e.toString());
+			}
+		}
+	}
+	logWrite("");
+}
+
+function test_read_tr_common(){
+	try{
+		var ret = navigator.capabilities.hasCapability("APIGroup", "tr_common");
+		if(ret != true){
+			logWrite("hasCapability(APIGroup, tr_common)の判定結果がtrueではないが、テストストリームのため無視してテストを実行");
+		}
+	} catch(e){
+		logWrite("hasCapability(APIGroup, tr_common)の実行がNGだが、テストストリームのため無視してテストを実行");
+	}
+	
+	for (var i = 0; i <= 31; i++) {
+		if(i>=24){
+			try{
+				var rArray = navigator.bmlCompat.browserPseudo.readPersistentArray(file_tr_base + i.toString(), fmts_tr[i]);
+				if(rArray == null){
+					logWrite(file_tr_base + i.toString() + " 読込：NG　戻り値=null");
+					continue;
+				}
+				
+				var resultMsg = "";
+				if(rArray.length == fmts_tr[i].split(",").length){
+					resultMsg = file_tr_base + i.toString() + " 読込：OK　";
+					
+					if((typeof rArray[0] !== 'number') || (typeof rArray[1] !== 'number') || (typeof rArray[2] !== 'number') || (typeof rArray[3] !== 'number') || (typeof rArray[4] !== 'number')){
+						resultMsg += "読込内容：NG(戻り値Array[0]-[4])";
+						logWrite(resultMsg);
+						continue;
+					}
+					
+					var evaluation_tsid = false;
+					for (var j = 0; j < allowed_tsids.length; j++) {
+						if(rArray[5] == allowed_tsids[j]){
+							evaluation_tsid = true;
+							break;
+						}
+					}
+					if(evaluation_tsid == false){
+						resultMsg += "読込内容：NG(戻り値Array[5])";
+						logWrite(resultMsg);
+						continue;
+					}
+					
+					if(rArray[6] != "tr" + ("0" + i.toString()).slice(-2) + S40Bno36){
+						resultMsg += "読込内容：NG(戻り値Array[6])";
+						logWrite(resultMsg);
+						continue;
+					}
+					
+					if(fmts_tr[i] == fmt1){
+						if(rArray[13] != yobi_tr[i]){
+							resultMsg += "読込内容：NG(戻り値Array[13])";
+							logWrite(resultMsg);
+							continue;
+						}
+					} else {
+						if(rArray[8] != yobi_tr[i]){
+							resultMsg += "読込内容：NG(戻り値Array[8])";
+							logWrite(resultMsg);
+							continue;
+						}
+					}
+					
+					resultMsg += "読込内容：OK";
+					logWrite(resultMsg);
+					
+				} else {
+					resultMsg = file_tr_base + i.toString() + " 読込：NG　";
+				}
+				
+			} catch(e){
+				logWrite(file_tr_base + i.toString() + " 読込：NG　例外発生 " + e.toString());
+			}
+		}
+	}
+	logWrite("");
+}
+
+function test_view_tr_common(){
+	try{
+		var ret = navigator.capabilities.hasCapability("APIGroup", "tr_common");
+		if(ret != true){
+			logWrite("hasCapability(APIGroup, tr_common)の判定結果がtrueではないが、テストストリームのため無視してテストを実行");
+		}
+	} catch(e){
+		logWrite("hasCapability(APIGroup, tr_common)の実行がNGだが、テストストリームのため無視してテストを実行");
+	}
+	
+	for (var i = 0; i <= 31; i++) {
+		if(i>=24){
+			try{
+				var rArray = navigator.bmlCompat.browserPseudo.readPersistentArray(file_tr_base + i.toString(), fmts_tr[i]);
+				if(rArray == null){
+					logWrite(file_tr_base + i.toString() + " 読込：NG　戻り値=null");
+				} else {
+					logWrite(file_tr_base + i.toString() + " = " + rArray.join(", "));
+				}
+			} catch(e){
+				logWrite(file_tr_base + i.toString() + " 読込：NG　例外発生 " + e.toString());
+			}
+		}
+	}
+	logWrite("");
+}
+
+
+
+
+
+var fmt_dummy = "S:64B";
+
+function test_write_dummy_bs_common(){
+	try{
+		var ret = navigator.capabilities.hasCapability("APIGroup", "bs_common");
+		if(ret != true){
+			logWrite("hasCapability(APIGroup, bs_common)の判定結果がtrueではないが、テストストリームのため無視してテストを実行");
+		}
+	} catch(e){
+		logWrite("hasCapability(APIGroup, bs_common)の実行がNGだが、テストストリームのため無視してテストを実行");
+	}
+	
+	for (var i = 0; i <= 15; i++) {
+		var nd = new Array();
+		nd[0] ="0000000000000000000000000000000000000000000000000000000000000000";			//0:[ダミーデータ64byte]
+		
+		if((i==0) || (i==14) || (i==15)){
+			try{
+				var ret = navigator.bmlCompat.browserPseudo.writePersistentArray(file_bs_base + i.toString(), fmt_dummy, nd);
+				if(ret == 64){
+					logWrite(file_bs_base + i.toString() + " 固定値書き込み結果：OK");
+				} else {
+					logWrite(file_bs_base + i.toString() + " 固定値書き込み結果：NG　戻り値=" + String(ret));
+				}
+			}catch(e){
+				logWrite(file_bs_base + i.toString() + " 固定値書き込み結果：NG　例外発生 " + e.toString());
+			}
+		}
+	}
+	logWrite("");
+}
+
+
+function test_write_dummy_tr_common(){
+	try{
+		var ret = navigator.capabilities.hasCapability("APIGroup", "tr_common");
+		if(ret != true){
+			logWrite("hasCapability(APIGroup, tr_common)の判定結果がtrueではないが、テストストリームのため無視してテストを実行");
+		}
+	} catch(e){
+		logWrite("hasCapability(APIGroup, tr_common)の実行がNGだが、テストストリームのため無視してテストを実行");
+	}
+	
+	var nowD = new Date();
+	var tempTS = nowD.getFullYear() + ("0" + (nowD.getMonth() + 1)).slice(-2) + ("0" + nowD.getDate()).slice(-2) + ("0" + nowD.getHours()).slice(-2) + ("0" + nowD.getMinutes()).slice(-2) + ("0" + nowD.getSeconds()).slice(-2);
+	var tempSec = parseInt(nowD.getSeconds(),10);
+	
+	for (var i = 0; i <= 31; i++) {
+		var nd = new Array();
+		nd[0] ="0000000000000000000000000000000000000000000000000000000000000000";			//0:[ダミーデータ64byte]
+		
+		if(i>=24){
+			try{
+				var ret = navigator.bmlCompat.browserPseudo.writePersistentArray(file_tr_base + i.toString(), fmt_dummy, nd);
+				if(ret == 64){
+					logWrite(file_tr_base + i.toString() + " 固定値書き込み結果：OK");
+				} else {
+					logWrite(file_tr_base + i.toString() + " 固定値書き込み結果：NG　戻り値=" + String(ret));
+				}
+			}catch(e){
+				logWrite(file_tr_base + i.toString() + " 固定値書き込み結果：NG　例外発生 " + e.toString());
+			}
+		}
+	}
+	logWrite("");
+}
+
+
+		</script>
+		
+	</body>
+
+</html>
+
